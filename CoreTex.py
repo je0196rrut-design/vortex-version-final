@@ -6,7 +6,7 @@ import numpy as np
 import time
 
 # --- TU API KEY ---
-API_KEY = os.getenv("AIzaSyAfTpyNJYdSqZJtZme8jo06IhEWKwNWzLI")
+API_KEY = os.getenv("key")
 
 try:
     genai.configure(api_key=API_KEY)
