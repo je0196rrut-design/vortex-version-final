@@ -5,16 +5,23 @@ import os
 import numpy as np
 import time
 
-# --- TU API KEY ---
-API_KEY = os.getenv("key")
+# =====================================================
+# 🔑 CLAVE API ACTUALIZADA
+# =====================================================
+API_KEY = "tu api key aquí"
 
+# Configuración de Conexión
 try:
-    genai.configure(api_key=API_KEY)
-    model_gemini = genai.GenerativeModel('gemini-1.5-flash')
-    print("✅ CoreTex AI: MODO EMPÁTICO ACTIVO")
-except:
+    if not API_KEY:
+        print("⚠️ CoreTex: No se detectó API Key.")
+        model_gemini = None
+    else:
+        genai.configure(api_key=API_KEY)
+        model_gemini = genai.GenerativeModel('gemini-1.5-flash')
+        print("✅ CoreTex AI: CONECTADO")
+except Exception as e:
     model_gemini = None
-    print("⚠️ CoreTex AI: MODO OFFLINE")
+    print(f"⚠️ CoreTex AI: OFFLINE ({e})")
 
 # --- HERRAMIENTAS ---
 def extraer_metadatos(texto):
@@ -26,30 +33,28 @@ def extraer_metadatos(texto):
             if len(parts) > 1:
                 nombre = parts[1].split(",")[0].strip().split(".")[0]
         except: pass
-    
-    return {
-        'email': email.group(0) if email else "no-email@vortex.ai",
-        'nombre': nombre,
-        'ticket_ref': f"REF-{np.random.randint(1000, 9999)}"
-    }
+    return {'email': email.group(0) if email else "no-email@vortex.ai", 'nombre': nombre, 'ticket_ref': f"REF-{np.random.randint(1000, 9999)}"}
 
+# 🔥 FILTRO DE PRIVACIDAD 🔥
 def anonimizar_regex(texto):
+    
+    # 1. TARJETAS DE CRÉDITO (Con espacios o guiones)
+    texto = re.sub(r'\b(?:\d{4}[ -]?){3}\d{4}\b', '🔒<TARJETA_CENSURADA>', texto)
+    
+    # 2. NÚMEROS LARGOS (Cuentas, IDs, Celulares)
+    texto = re.sub(r'\b\d{7,}\b', '🔒<NUM_OCULTO>', texto)
+    
+    # 3. CORREOS ELECTRÓNICOS
     texto = re.sub(r'[\w\.-]+@[\w\.-]+', '🔒<EMAIL_OCULTO>', texto)
-    texto = re.sub(r'\b\d{7,10}\b', '🔒<TEL_OCULTO>', texto)
+    
     return texto
 
-# --- MOTOR DE ANÁLISIS ---
+# --- ANÁLISIS ---
 def procesar_ticket_inteligente(texto_ticket):
     if not model_gemini: return _respuesta_dummy()
 
     prompt = f"""
     Analiza este ticket: "{texto_ticket}"
-    
-    REGLAS:
-    1. Si hay quejas de lentitud, error o fallos -> EMOCION: "FRUSTRACION".
-    2. Si hay amenazas de irse, estafa o insultos -> EMOCION: "IRA".
-    3. Si es compra o pregunta -> EMOCION: "NEUTRAL" o "INTERES".
-
     Responde SOLO JSON:
     {{
         "emocion": "IRA, FRUSTRACION, URGENCIA, NEUTRAL, FELICIDAD",
@@ -58,41 +63,31 @@ def procesar_ticket_inteligente(texto_ticket):
         "es_phishing": boolean
     }}
     """
-
     try:
         response = model_gemini.generate_content(prompt)
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
         data = json.loads(clean_text)
         
-        base_riesgo = {
-            "IRA": 90, "FRUSTRACION": 70, "URGENCIA": 60,
-            "TRISTEZA": 40, "NEUTRAL": 10, "FELICIDAD": 0
-        }
-        
+        base = {"IRA": 90, "FRUSTRACION": 70, "URGENCIA": 60, "NEUTRAL": 10, "FELICIDAD": 0}
         emocion = data.get("emocion", "NEUTRAL").upper()
         intensidad = int(data.get("intensidad", 5))
-        riesgo = base_riesgo.get(emocion, 20) + (intensidad * 2)
+        riesgo = base.get(emocion, 20) + (intensidad * 2)
         
         if "no funciona" in texto_ticket.lower() or "error" in texto_ticket.lower():
             riesgo = max(riesgo, 60)
 
-        riesgo = min(riesgo, 100)
-
         return {
-            'riesgo_extra': float(riesgo),
+            'riesgo_extra': float(min(riesgo, 100)),
             'sentimiento_valor': intensidad / 10,
             'sentimiento_etiqueta': emocion,
             'tipo_ticket': data.get("intencion", "SOPORTE").upper(),
             'phishing': data.get("es_phishing", False),
             'intencion': data.get("intencion", "")
         }
-
-    except Exception as e:
-        print(f"Error IA: {e}")
-        return _respuesta_dummy()
+    except: return _respuesta_dummy()
 
 def _respuesta_dummy():
-    return {'riesgo_extra': 50.0, 'sentimiento_valor': 0.5, 'sentimiento_etiqueta': "NEUTRAL", 'tipo_ticket': "SOPORTE", 'phishing': False}
+    return {'riesgo_extra': 50.0, 'sentimiento_etiqueta': "NEUTRAL", 'tipo_ticket': "SOPORTE", 'phishing': False}
 
 def recomendar_accion(riesgo, sentimiento, phishing):
     if phishing: return "🛑 BLOQUEO TOTAL"
@@ -100,45 +95,26 @@ def recomendar_accion(riesgo, sentimiento, phishing):
     if riesgo >= 60: return "🛠️ SOPORTE PRIORITARIO"
     return "✅ ATENCIÓN ESTÁNDAR"
 
-# --- GENERADOR DE RESPUESTAS (AQUÍ ESTÁ EL CAMBIO) ---
+# --- RESPUESTAS TÁCTICAS ---
 def generar_respuesta_sugerida(texto, tipo, accion):
-    
-    # 1. INTENTO CON IA (Plan A - Personalizado)
+    # Plan A: IA
     if model_gemini:
         prompt = f"""
-        Actúa como un agente de soporte senior. Redacta una respuesta para este cliente.
-        Cliente dice: "{texto}"
-        Contexto: {tipo} | Acción: {accion}
-
-        REGLAS DE TONO (OBLIGATORIAS):
-        - Si es FUGA o IRA: NO des las gracias. Pide disculpas sinceras y di que un gerente lo verá ya.
-        - Si es FALLA TÉCNICA: Sé directo. "Entendemos el problema, ingeniería ya está revisando".
-        - Si es PHISHING: Sé autoritario. "Alerta de seguridad. No toque nada".
-        - NUNCA uses frases genéricas como "Gracias por su mensaje".
-
-        Respuesta (Máx 30 palabras):
+        Actúa como soporte experto. Respuesta corta para: "{texto}".
+        Contexto: {tipo} | {accion}.
+        NO des las gracias si están enojados. Sé resolutivo.
+        Si hay datos sensibles, di "Hemos ocultado sus datos por seguridad".
+        Respuesta (Max 25 palabras):
         """
-        try:
-            return model_gemini.generate_content(prompt).text.strip()
-        except:
-            pass # Si falla la IA, pasamos al Plan B (Abajo)
+        try: return model_gemini.generate_content(prompt).text.strip()
+        except: pass
 
-    # 2. PLAN B: PLANTILLAS TÁCTICAS (Si la IA falla, usa esto)
-    tipo_upper = str(tipo).upper()
-    
-    if "PHISHING" in tipo_upper:
-        return "⚠️ ALERTA: Hemos detectado un enlace peligroso. Por su seguridad, no haga clic y cambie su contraseña."
-    
-    if "FUGA" in tipo_upper or "IRA" in tipo_upper or "ESTAFA" in texto.upper():
-        return "Lamentamos profundamente su experiencia. He escalado su caso como PRIORIDAD CRÍTICA a la gerencia."
-    
-    if "FALLA" in tipo_upper or "TECNICA" in tipo_upper or "FRUSTRACION" in tipo_upper:
-        return "Entendemos el inconveniente técnico. Nuestro equipo de ingeniería ya está revisando los logs de su cuenta."
-    
-    if "VENTA" in tipo_upper or "OPORTUNIDAD" in tipo_upper:
-        return "¡Excelente! Un ejecutivo comercial le enviará la propuesta personalizada en breve."
-
-    return "Hemos recibido su solicitud. Un agente especializado está revisando los detalles."
+    # Plan B (Si falla la IA)
+    t = str(tipo).upper()
+    if "PHISHING" in t: return "⚠️ ALERTA: No comparta datos. Bloqueando enlace."
+    if "FUGA" in t or "IRA" in t: return "Lamentamos esto. Un gerente revisará su caso YA."
+    if "VENTA" in t: return "¡Genial! Un asesor comercial lo contactará."
+    return "Entendido. Ingeniería está revisando su solicitud."
 
 # Dummies
 def entrenar_modelo_completo(df): return None, None, None

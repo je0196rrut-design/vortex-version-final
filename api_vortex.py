@@ -12,7 +12,7 @@ from datetime import datetime
 import CoreTex
 import unicodedata
 
-app = FastAPI(title="Vortex Suite API", version="Privacy Shield")
+app = FastAPI(title="Vortex Suite API", version="Final Ecosystem")
 
 app.add_middleware(
     CORSMiddleware,
@@ -22,14 +22,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ==========================================
+# 1. BASE DE DATOS MAESTRA
+# ==========================================
 def init_db():
     conn = sqlite3.connect('historial_vortex.db')
     c = conn.cursor()
+    # Estructura completa incluyendo 'respuesta_ia'
     c.execute('''CREATE TABLE IF NOT EXISTS tickets
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   fecha TEXT, original TEXT, anonimo TEXT, tipo TEXT, 
                   riesgo REAL, accion TEXT, usuario TEXT, email TEXT, ref TEXT, 
-                  estado TEXT)''') 
+                  estado TEXT, respuesta_ia TEXT)''') 
     conn.commit()
     conn.close()
 
@@ -39,7 +43,9 @@ def normalizar_texto(texto):
     texto = ''.join((c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn'))
     return texto
 
-# --- INPUTS ---
+# ==========================================
+# 2. MODELOS DE DATOS
+# ==========================================
 class ClientForm(BaseModel):
     nombre: str
     email: str
@@ -61,45 +67,65 @@ class TicketOutput(BaseModel):
     accion_recomendada: str
     respuesta_sugerida: str
 
-# --- CREACIÓN Y SIMULACIÓN ---
+# ==========================================
+# 3. ENDPOINTS DE ENTRADA (Simulación y Real)
+# ==========================================
+
 @app.post("/crear_ticket_cliente")
 def crear_ticket_cliente(form: ClientForm):
     conn = sqlite3.connect('historial_vortex.db')
     c = conn.cursor()
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ref = f"T-{np.random.randint(10000, 99999)}"
-    # Guardamos el original en la DB (Privado), pero el estado es PENDIENTE
-    c.execute("INSERT INTO tickets (fecha, original, usuario, email, ref, estado) VALUES (?, ?, ?, ?, ?, ?)",
-              (fecha, form.mensaje, form.nombre, form.email, ref, "PENDIENTE"))
+    # Guardamos vacía la respuesta IA porque aún no se procesa
+    c.execute("INSERT INTO tickets (fecha, original, usuario, email, ref, estado, respuesta_ia) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              (fecha, form.mensaje, form.nombre, form.email, ref, "PENDIENTE", ""))
     conn.commit()
     conn.close()
     return {"status": "ok", "ref": ref}
 
 @app.post("/simular_trafico")
 def simular_trafico():
+    """Genera una mezcla estratégica: Ventas, Fallas y Fugas."""
     casos = [
-        ("El sistema no carga y estoy perdiendo ventas. URGENTE.", "Ana Lopez", "ana@cli.com"),
-        ("Quisiera cotizar un plan Enterprise.", "Pedro Gil", "pedro@tech.co"),
-        ("Actualice sus datos aqui http://bit.ly/fake.", "Hacker", "admin@scam.com"),
-        ("Quiero cancelar mi suscripción ya.", "Carlos B.", "carlos@baja.com")
+        # VENTAS (Para que el Dashboard muestre dinero)
+        ("Hola, quisiera cotizar el plan Enterprise para 50 usuarios.", "Pedro CEO", "ceo@tech.co"),
+        ("Me interesa comprar licencias adicionales, ¿me pueden ayudar?", "Maria Sales", "maria@corp.com"),
+        
+        # SOPORTE TÉCNICO (Riesgo Medio)
+        ("El sistema no funciona y me urge sacar un reporte.", "Luis Soporte", "luis@mail.com"),
+        
+        # FUGA / IRA (Riesgo Alto)
+        ("Son unos estafadores, quiero cancelar mi suscripción YA.", "Carlos Furioso", "carlos@baja.com"),
+        
+        # PHISHING (Seguridad)
+        ("Actualice sus datos aquí http://bit.ly/robo o perderá acceso.", "Hacker", "admin@fake.com")
     ]
+    
     conn = sqlite3.connect('historial_vortex.db')
     c = conn.cursor()
     nuevos = []
-    for _ in range(3): 
+    
+    # Creamos 4 tickets de golpe
+    for _ in range(4): 
         texto, user, mail = random.choice(casos)
         fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ref = f"T-{np.random.randint(1000,9999)}"
-        c.execute("INSERT INTO tickets (fecha, original, usuario, email, ref, estado) VALUES (?, ?, ?, ?, ?, ?)",
-                  (fecha, texto, user, mail, ref, "PENDIENTE"))
+        c.execute("INSERT INTO tickets (fecha, original, usuario, email, ref, estado, respuesta_ia) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                  (fecha, texto, user, mail, ref, "PENDIENTE", ""))
         nuevos.append(user)
+        
     conn.commit()
     conn.close()
-    return {"mensaje": "Ok", "usuarios": nuevos}
+    return {"mensaje": "Trafico simulado con éxito", "usuarios": nuevos}
 
-# --- EL FILTRO DE PRIVACIDAD (AQUÍ ESTÁ LA MAGIA) ---
+# ==========================================
+# 4. GESTIÓN DE DATOS (Privacidad y KPIs)
+# ==========================================
+
 @app.get("/tickets_pendientes")
 def tickets_pendientes():
+    """Entrega tickets al Agente CON PRIVACIDAD ACTIVADA."""
     conn = sqlite3.connect('historial_vortex.db')
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
@@ -107,35 +133,46 @@ def tickets_pendientes():
     filas = c.fetchall()
     conn.close()
     
-    # PROCESAMOS LA LISTA PARA CENSURAR DATOS AL AGENTE
     tickets_seguros = []
     for row in filas:
         t = dict(row)
-        # Aplicamos la censura de CoreTex ANTES de enviar al Frontend
+        # 🔒 CENSURA DE DATOS PARA EL AGENTE
         t['email'] = "🔒<EMAIL_OCULTO>" 
         t['original'] = CoreTex.anonimizar_regex(t['original']) 
         tickets_seguros.append(t)
-        
     return tickets_seguros
 
 @app.get("/datos_grafica")
 def datos_grafica():
+    """KPIs para el Gerente."""
     conn = sqlite3.connect('historial_vortex.db')
     c = conn.cursor()
+    
+    # Datos Gráfica
     c.execute("SELECT riesgo, fecha FROM tickets WHERE estado='RESUELTO' ORDER BY fecha DESC LIMIT 20")
     data = c.fetchall()
+    
+    # Contadores
     c.execute("SELECT COUNT(*) FROM tickets WHERE estado='PENDIENTE'")
     pendientes = c.fetchone()[0]
     c.execute("SELECT COUNT(*) FROM tickets WHERE estado='RESUELTO'")
     resueltos = c.fetchone()[0]
     c.execute("SELECT COUNT(*) FROM tickets WHERE estado='RESUELTO' AND riesgo >= 60")
     criticos = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM tickets WHERE estado='RESUELTO' AND tipo LIKE '%VENTA%'")
+    # KPI DE VENTAS (Busca la palabra 'VENTA' o 'OPORTUNIDAD' en el tipo)
+    c.execute("SELECT COUNT(*) FROM tickets WHERE estado='RESUELTO' AND (tipo LIKE '%VENTA%' OR tipo LIKE '%OPORTUNIDAD%')")
     ventas = c.fetchone()[0]
+
     conn.close()
+    
     riesgos = [x[0] for x in reversed(data)]
     fechas = [x[1].split(' ')[1] for x in reversed(data)]
-    return {"riesgos": riesgos, "fechas": fechas, "kpi_pendientes": pendientes, "kpi_total": resueltos + pendientes, "kpi_criticos": criticos, "kpi_ventas": ventas}
+    
+    return {
+        "riesgos": riesgos, "fechas": fechas, 
+        "kpi_pendientes": pendientes, "kpi_total": resueltos + pendientes, 
+        "kpi_criticos": criticos, "kpi_ventas": ventas
+    }
 
 @app.get("/ver_historial")
 def ver_historial():
@@ -154,15 +191,17 @@ def borrar_historial():
     conn.close()
     return {"mensaje": "DB Limpia"}
 
-# --- LÓGICA DE ANÁLISIS ---
+# ==========================================
+# 5. LÓGICA DE ANÁLISIS HÍBRIDA
+# ==========================================
+
 @app.post("/analizar_ticket", response_model=TicketOutput)
 def analizar_ticket(ticket: TicketInput):
     texto_limpio_logica = normalizar_texto(ticket.texto)
     meta = CoreTex.extraer_metadatos(ticket.texto)
-    # Generamos la versión censurada para guardarla
     texto_anonimo = CoreTex.anonimizar_regex(ticket.texto)
 
-    # 1. IA (Ahora es más sensible)
+    # 1. CONSULTA A LA IA (Motor Emocional)
     print("🤖 Consultando IA...")
     info_ia = CoreTex.procesar_ticket_inteligente(ticket.texto)
     
@@ -171,44 +210,50 @@ def analizar_ticket(ticket: TicketInput):
     emocion_final = info_ia['sentimiento_etiqueta']
     accion_final = "ANÁLISIS IA"
 
-    # 2. REGLAS (Seguro de vida)
+    # 2. REGLAS DE NEGOCIO (Prioridades)
     palabras_muerte = ["CANCELAR", "BAJA", "RENUNCIA", "ME VOY", "ESTAFA", "DEMANDA", "ABOGADO", "ROBO"]
     palabras_falla = ["NO FUNCIONA", "FALLA", "ERROR", "LENTO", "BUG", "PROBLEMA"]
     palabras_phishing = ["HTTP", "BIT.LY", "PASSWORD"]
+    palabras_venta = ["COMPRAR", "CONTRATAR", "COTIZAR", "PRECIO", "COSTO", "PLAN", "UPGRADE", "INTERESADO", "ADQUIRIR"]
 
     if any(p in texto_limpio_logica for p in palabras_phishing):
         riesgo_final = 100.0
         tipo_final = "PHISHING"
         accion_final = "🛑 BLOQUEO DE SEGURIDAD"
+        
     elif any(p in texto_limpio_logica for p in palabras_muerte):
         riesgo_final = max(riesgo_final, 90.0) 
         tipo_final = "FUGA_INMINENTE"
         accion_final = "🔥 ALERTA ROJA: RETENCIÓN"
+        
     elif any(p in texto_limpio_logica for p in palabras_falla):
-        riesgo_final = max(riesgo_final, 60.0) # Aseguramos mínimo 60%
-        # Si la IA dijo que era Frustración, lo mantenemos visible
-        if "FRUSTRACION" in emocion_final or "URGENCIA" in emocion_final:
-            tipo_final = f"FALLA TÉCNICA ({emocion_final})"
-        else:
-            tipo_final = "FALLA TÉCNICA"
+        riesgo_final = max(riesgo_final, 60.0)
+        tipo_final = f"FALLA TÉCNICA ({emocion_final})"
         accion_final = "⚠️ SOPORTE PRIORITARIO"
+        
+    elif any(p in texto_limpio_logica for p in palabras_venta):
+        riesgo_final = 10.0 # Riesgo bajo
+        tipo_final = f"💰 OPORTUNIDAD VENTA ({emocion_final})"
+        accion_final = "⭐ NOTIFICAR A VENTAS"
 
+    # Si las reglas no impusieron una acción, usamos la recomendación de la IA
     if accion_final == "ANÁLISIS IA":
         accion_final = CoreTex.recomendar_accion(riesgo_final, info_ia['sentimiento_valor'], info_ia['phishing'])
 
+    # 3. GENERAR RESPUESTA TÁCTICA
     resp_sugerida = CoreTex.generar_respuesta_sugerida(ticket.texto, tipo_final, accion_final)
 
-    # 3. GUARDAR
+    # 4. GUARDAR EN DB
     conn = sqlite3.connect('historial_vortex.db')
     c = conn.cursor()
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     if ticket.id_db: 
-        c.execute("UPDATE tickets SET anonimo=?, tipo=?, riesgo=?, accion=?, estado='RESUELTO', fecha=? WHERE id=?", 
-                  (texto_anonimo, tipo_final, riesgo_final, accion_final, fecha, ticket.id_db))
+        c.execute("UPDATE tickets SET anonimo=?, tipo=?, riesgo=?, accion=?, estado='RESUELTO', fecha=?, respuesta_ia=? WHERE id=?", 
+                  (texto_anonimo, tipo_final, riesgo_final, accion_final, fecha, resp_sugerida, ticket.id_db))
     else: 
-        c.execute("INSERT INTO tickets (fecha, original, anonimo, tipo, riesgo, accion, usuario, email, ref, estado) VALUES (?,?,?,?,?,?,?,?,?,?)", 
-                  (fecha, ticket.texto, texto_anonimo, tipo_final, riesgo_final, accion_final, meta['nombre'], meta['email'], meta['ticket_ref'], 'RESUELTO'))
+        c.execute("INSERT INTO tickets (fecha, original, anonimo, tipo, riesgo, accion, usuario, email, ref, estado, respuesta_ia) VALUES (?,?,?,?,?,?,?,?,?,?,?)", 
+                  (fecha, ticket.texto, texto_anonimo, tipo_final, riesgo_final, accion_final, meta['nombre'], meta['email'], meta['ticket_ref'], 'RESUELTO', resp_sugerida))
     
     conn.commit()
     conn.close()
