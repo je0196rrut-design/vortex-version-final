@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Vortex | Agent Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        
+        /* Scrollbar personalizada invisible pero funcional */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Efecto Cristal */
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.4); 
+            backdrop-filter: blur(12px); 
+            border-right: 1px solid rgba(255, 255, 255, 0.05); 
+        }
+
+        /* Tarjetas de Ticket */
+        .ticket-card {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.2s ease;
+        }
+        .ticket-card:hover {
+            background: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.3);
+            transform: translateX(4px);
+        }
+        /* Ticket Seleccionado */
+        .ticket-active {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, rgba(15, 23, 42, 0) 100%);
+            border-left: 4px solid #3b82f6;
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        /* Animaciones */
+        .fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .pulse-ring { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); animation: pulse-blue 2s infinite; }
+        @keyframes pulse-blue { 
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col relative" onload="initInbox()">
+
+    <div class="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div class="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-blue-900/20 rounded-full blur-[120px]"></div>
+        <div class="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-cyan-900/10 rounded-full blur-[100px]"></div>
+    </div>
+
+    <header class="h-16 flex justify-between items-center px-6 border-b border-slate-700/50 bg-slate-900/80 backdrop-blur-md z-20">
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                    <i class="fas fa-satellite-dish text-sm"></i>
+                </div>
+                <h1 class="text-xl font-bold text-white tracking-tight">VORTEX <span class="text-slate-500 font-normal">CONSOLE</span></h1>
+            </div>
+            
+            <a href="/" class="group flex items-center gap-2 text-xs text-slate-400 hover:text-white transition bg-slate-800/50 px-3 py-1.5 rounded-full border border-slate-700 hover:border-slate-500">
+                <i class="fas fa-chart-pie group-hover:text-cyan-400 transition"></i> 
+                <span>Dashboard Gerencial</span>
+            </a>
+        </div>
+        
+        <button onclick="simular()" class="bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 text-xs px-4 py-2 rounded-lg border border-blue-500/30 hover:border-blue-500/50 transition flex items-center gap-2">
+            <i class="fas fa-wifi animate-pulse"></i> SIMULAR SEÑAL ENTRANTE
+        </button>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        
+        <div class="w-1/3 glass-panel flex flex-col z-10">
+            <div class="p-5 border-b border-slate-700/50 flex justify-between items-end bg-slate-800/20">
+                <div>
+                    <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Bandeja de Entrada</h2>
+                    <div class="text-2xl font-bold text-white"><span id="countPendientes">0</span> <span class="text-sm font-normal text-slate-500">pendientes</span></div>
+                </div>
+                <button onclick="cargarPendientes()" class="text-slate-500 hover:text-white p-2 rounded-full hover:bg-slate-700/50 transition"><i class="fas fa-sync-alt"></i></button>
+            </div>
+            
+            <div id="inboxList" class="flex-1 overflow-y-auto p-3 space-y-3">
+                </div>
+        </div>
+
+        <div class="w-2/3 flex flex-col relative bg-slate-900/50">
+            
+            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-slate-600 pointer-events-none">
+                <div class="w-24 h-24 rounded-full bg-slate-800/50 flex items-center justify-center mb-6 border border-slate-700">
+                    <i class="fas fa-inbox text-4xl opacity-30"></i>
+                </div>
+                <p class="text-lg font-light">Esperando selección de ticket...</p>
+                <p class="text-xs text-slate-600 mt-2">Seleccione un elemento de la izquierda para analizar</p>
+            </div>
+
+            <div id="workspace" class="hidden flex-col h-full fade-in p-8 overflow-y-auto">
+                
+                <div class="flex justify-between items-start mb-8">
+                    <div class="flex gap-4">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl shadow-inner">
+                            👤
+                        </div>
+                        <div>
+                            <h2 id="wkUser" class="text-2xl font-bold text-white leading-tight">--</h2>
+                            <p id="wkEmail" class="text-sm text-cyan-400 font-mono mt-1 opacity-80">--</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <div id="wkRef" class="text-xs font-mono text-slate-500 bg-slate-800 px-2 py-1 rounded border border-slate-700">REF-0000</div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                            <span class="text-xs font-bold text-yellow-500 uppercase tracking-wide">Pendiente de Acción</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800/40 p-6 rounded-2xl border border-slate-700/50 mb-8 relative group">
+                    <div class="absolute -top-3 left-4 bg-slate-900 px-2 text-xs text-slate-500 uppercase font-bold tracking-wider">Mensaje Original</div>
+                    <p id="wkText" class="text-slate-200 text-lg leading-relaxed font-light">--</p>
+                </div>
+                
+                <input type="hidden" id="wkIdDB">
+
+                <div class="flex justify-center mb-8">
+                    <button onclick="resolver()" class="group relative px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-xl font-bold text-white shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:scale-105 transition-all duration-300 w-full md:w-auto">
+                        <div class="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <span class="flex items-center justify-center gap-3">
+                            <i class="fas fa-brain"></i> 
+                            EJECUTAR ANÁLISIS VORTEX AI
+                        </span>
+                    </button>
+                </div>
+
+                <div id="resultPanel" class="hidden fade-in space-y-6">
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700 text-center relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
+                            <div class="text-xs text-slate-400 uppercase mb-2">Nivel de Riesgo</div>
+                            <div id="resRiesgo" class="text-4xl font-black text-white tracking-tighter">0%</div>
+                        </div>
+                        <div class="bg-slate-800/60 p-5 rounded-2xl border border-slate-700 text-center flex flex-col justify-center items-center relative overflow-hidden">
+                            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-50"></div>
+                            <div class="text-xs text-slate-400 uppercase mb-2">Diagnóstico IA</div>
+                            <div id="resTipo" class="px-4 py-1.5 rounded-full text-xs font-bold bg-slate-700 text-slate-300 border border-slate-600 shadow-sm">--</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900/80 p-1 rounded-2xl border border-blue-500/30 shadow-2xl relative">
+                        <div class="bg-slate-800/50 p-4 rounded-xl">
+                            <div class="flex justify-between items-center mb-4">
+                                <div class="flex items-center gap-2 text-blue-400">
+                                    <i class="fas fa-robot"></i>
+                                    <span class="text-xs font-bold uppercase tracking-wider">Vortex Copilot</span>
+                                </div>
+                                <button onclick="copiar()" class="text-slate-500 hover:text-white transition text-xs flex items-center gap-1">
+                                    <i class="fas fa-copy"></i> Copiar
+                                </button>
+                            </div>
+                            <textarea id="resRespuesta" rows="4" class="w-full bg-transparent text-slate-300 text-sm font-mono focus:outline-none resize-none" readonly></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-center gap-2 text-green-400/80 text-xs bg-green-900/10 py-2 rounded-lg border border-green-500/10">
+                        <i class="fas fa-check-circle"></i> 
+                        <span>Base de Datos actualizada correctamente.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedTicketId = null;
+
+        function initInbox() { cargarPendientes(); setInterval(cargarPendientes, 5000); }
+
+        async function simular() {
+            const btn = document.querySelector('button[onclick="simular()"]');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Conectando...';
+            await fetch('http://localhost:8000/simular_trafico', { method: 'POST' });
+            await cargarPendientes();
+            btn.innerHTML = '<i class="fas fa-wifi animate-pulse"></i> SIMULAR SEÑAL ENTRANTE';
+        }
+
+        async function cargarPendientes() {
+            const res = await fetch('http://localhost:8000/tickets_pendientes');
+            const data = await res.json();
+            const list = document.getElementById('inboxList');
+            
+            // Guardamos el contenido actual para no parpadear si no es necesario
+            if (list.childElementCount === data.length && data.length > 0) return;
+
+            list.innerHTML = '';
+            document.getElementById('countPendientes').innerText = data.length;
+
+            if(data.length === 0) {
+                list.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-64 text-slate-600 opacity-50">
+                        <i class="fas fa-check-circle text-4xl mb-3"></i>
+                        <p class="text-xs uppercase font-bold tracking-widest">Todo limpio</p>
+                    </div>`;
+                return;
+            }
+
+            data.forEach(t => {
+                const isActive = selectedTicketId === t.id ? 'ticket-active' : '';
+                list.innerHTML += `
+                <div onclick="abrirTicket(this, ${t.id}, '${t.usuario}', '${t.email}', '${t.original.replace(/'/g, "\\'")}', '${t.ref}')" 
+                     class="ticket-card p-4 rounded-xl cursor-pointer mb-3 ${isActive}">
+                    <div class="flex justify-between mb-2">
+                        <span class="font-bold text-xs text-slate-200">${t.usuario}</span>
+                        <span class="text-[10px] text-slate-500 font-mono">${t.fecha.split(' ')[1]}</span>
+                    </div>
+                    <div class="text-xs text-slate-400 truncate font-light">${t.original}</div>
+                </div>`;
+            });
+        }
+
+        function abrirTicket(element, id, user, email, text, ref) {
+            // Estilos de selección visual
+            document.querySelectorAll('.ticket-card').forEach(el => el.classList.remove('ticket-active'));
+            element.classList.add('ticket-active');
+            selectedTicketId = id;
+
+            // Mostrar Workspace
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('workspace').classList.remove('hidden');
+            document.getElementById('workspace').classList.remove('fade-in');
+            void document.getElementById('workspace').offsetWidth; // Trigger reflow
+            document.getElementById('workspace').classList.add('fade-in');
+            
+            document.getElementById('resultPanel').classList.add('hidden'); // Ocultar resultado anterior
+
+            // Llenar datos
+            document.getElementById('wkUser').innerText = user;
+            document.getElementById('wkEmail').innerText = email;
+            document.getElementById('wkRef').innerText = ref;
+            document.getElementById('wkText').innerText = text;
+            document.getElementById('wkIdDB').value = id;
+        }
+
+        async function resolver() {
+            const txt = document.getElementById('wkText').innerText;
+            const id = document.getElementById('wkIdDB').value;
+            
+            const btn = document.querySelector('button[onclick="resolver()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> PROCESANDO DATOS...';
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+
+            try {
+                const res = await fetch('http://localhost:8000/analizar_ticket', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ texto: txt, id_db: parseInt(id) }) 
+                });
+                const data = await res.json();
+
+                // Mostrar Resultados
+                document.getElementById('resultPanel').classList.remove('hidden');
+                document.getElementById('resRiesgo').innerText = data.riesgo_churn + "%";
+                document.getElementById('resTipo').innerText = data.tipo_ticket;
+                document.getElementById('resRespuesta').value = data.respuesta_sugerida;
+                
+                // Lógica de Colores de Riesgo
+                const riesgoEl = document.getElementById('resRiesgo');
+                if(data.riesgo_churn >= 80) riesgoEl.className = "text-4xl font-black text-red-500 tracking-tighter drop-shadow-lg";
+                else if(data.riesgo_churn <= 20) riesgoEl.className = "text-4xl font-black text-green-400 tracking-tighter drop-shadow-lg";
+                else riesgoEl.className = "text-4xl font-black text-yellow-400 tracking-tighter drop-shadow-lg";
+
+                // Refrescar lista (el ticket se irá)
+                setTimeout(() => {
+                    cargarPendientes();
+                    selectedTicketId = null;
+                }, 1000);
+
+            } catch (e) {
+                console.error(e);
+                alert("Error de conexión con la IA");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        }
+
+        function copiar() {
+            const el = document.getElementById('resRespuesta');
+            el.select();
+            document.execCommand("copy");
+            // Feedback visual pequeño
+            const btn = document.querySelector('button[onclick="copiar()"]');
+            btn.innerHTML = '<i class="fas fa-check"></i> Copiado';
+            setTimeout(() => btn.innerHTML = '<i class="fas fa-copy"></i> Copiar', 2000);
+        }
+    </script>
+</body>
+</html>

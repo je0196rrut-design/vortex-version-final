@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Soporte al Cliente | Vortex</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        /* TEMA VORTEX: Fondo oscuro y fuentes limpias */
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; }
+        
+        /* Efecto Cristal */
+        .glass-panel { 
+            background: rgba(30, 41, 59, 0.7); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+        }
+        
+        .fade-in { animation: fadeIn 0.6s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Inputs personalizados */
+        .vortex-input {
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid #334155;
+            color: white;
+            transition: all 0.3s;
+        }
+        .vortex-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+            outline: none;
+        }
+    </style>
+</head>
+<body class="h-screen flex items-center justify-center relative overflow-hidden">
+
+    <div class="absolute top-0 left-0 w-full h-full overflow-hidden -z-10">
+        <div class="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-600/20 rounded-full blur-[100px]"></div>
+        <div class="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-cyan-600/20 rounded-full blur-[100px]"></div>
+    </div>
+
+    <div class="glass-panel p-8 rounded-2xl shadow-2xl w-full max-w-md fade-in">
+        
+        <div class="text-center mb-8">
+            <div class="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-full flex items-center justify-center text-white text-2xl mx-auto mb-4 shadow-lg shadow-blue-500/30">
+                <i class="fas fa-headset"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-white tracking-wide">Centro de Ayuda</h1>
+            <p class="text-slate-400 text-sm mt-1">Conectado a <span class="text-blue-400 font-bold">Vortex AI Sentinel</span></p>
+        </div>
+
+        <div id="formContainer" class="space-y-5">
+            <div>
+                <label class="block text-xs font-bold text-blue-300 uppercase mb-2 ml-1">Tu Nombre</label>
+                <div class="relative">
+                    <i class="fas fa-user absolute left-3 top-3.5 text-slate-500 text-sm"></i>
+                    <input type="text" id="cliName" class="vortex-input w-full rounded-xl p-3 pl-10 text-sm" placeholder="Ej: Juan Pérez">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-blue-300 uppercase mb-2 ml-1">Tu Correo</label>
+                <div class="relative">
+                    <i class="fas fa-envelope absolute left-3 top-3.5 text-slate-500 text-sm"></i>
+                    <input type="email" id="cliEmail" class="vortex-input w-full rounded-xl p-3 pl-10 text-sm" placeholder="juan@empresa.com">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-blue-300 uppercase mb-2 ml-1">¿Qué sucede?</label>
+                <textarea id="cliMsg" rows="4" class="vortex-input w-full rounded-xl p-3 text-sm resize-none" placeholder="Describe tu problema detalladamente..."></textarea>
+            </div>
+
+            <button onclick="enviarTicket()" class="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-900/50 transition transform hover:scale-[1.02] flex justify-center items-center gap-2 mt-4">
+                <i class="fas fa-paper-plane"></i> ENVIAR TICKET
+            </button>
+        </div>
+
+        <div id="successMessage" class="hidden text-center py-10 fade-in">
+            <div class="text-green-400 text-6xl mb-4 drop-shadow-lg"><i class="fas fa-check-circle"></i></div>
+            <h2 class="text-2xl font-bold text-white">¡Recibido!</h2>
+            <p class="text-slate-400 text-sm mt-2">Tu ticket <span id="ticketRef" class="font-mono text-cyan-400 bg-slate-800 px-2 py-1 rounded">#T-0000</span> está en cola.</p>
+            
+            <div class="mt-6 bg-slate-800/50 p-4 rounded-lg border border-slate-700 text-xs text-slate-300">
+                <i class="fas fa-robot mr-2 text-blue-400"></i> Vortex AI está analizando tu caso ahora mismo.
+            </div>
+
+            <button onclick="location.reload()" class="mt-6 text-slate-400 text-sm hover:text-white transition underline decoration-slate-600">Enviar otro caso</button>
+        </div>
+
+    </div>
+
+    <div class="absolute bottom-4 text-slate-600 text-xs">
+        Powered by Vortex Sentinel
+    </div>
+
+    <script>
+        async function enviarTicket() {
+            const nombre = document.getElementById('cliName').value;
+            const email = document.getElementById('cliEmail').value;
+            const mensaje = document.getElementById('cliMsg').value;
+
+            if(!nombre || !email || !mensaje) {
+                // Efecto de vibración si falta algo (opcional visual)
+                document.getElementById('formContainer').classList.add('animate-pulse');
+                setTimeout(() => document.getElementById('formContainer').classList.remove('animate-pulse'), 500);
+                alert("Por favor completa todos los campos.");
+                return;
+            }
+
+            const btn = document.querySelector('button[onclick="enviarTicket()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ENVIANDO A VORTEX...';
+            btn.disabled = true;
+            btn.classList.add('opacity-75');
+
+            try {
+                const res = await fetch('http://localhost:8000/crear_ticket_cliente', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, email, mensaje })
+                });
+                
+                if(!res.ok) throw new Error("Error API");
+
+                const data = await res.json();
+
+                // Transición suave
+                document.getElementById('formContainer').style.display = 'none';
+                document.getElementById('successMessage').classList.remove('hidden');
+                document.getElementById('ticketRef').innerText = data.ref;
+
+            } catch (error) {
+                console.error(error);
+                alert("Error de conexión con el Servidor Vortex. Verifica que api_vortex.py esté corriendo.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                btn.classList.remove('opacity-75');
+            }
+        }
+    </script>
+</body>
+</html>
