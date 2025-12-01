@@ -1,0 +1,14 @@
+# Carpetas de entorno (Pesadas)
+venv/
+.venv/
+
+# Basura de sistema
+__pycache__/
+
+# Datos y Bases de datos (Seguridad)
+*.db
+*.sqlite3
+
+# Archivos pesados (El CSV de 5000 tickets)
+*.csv
+tickets_5000.csv
